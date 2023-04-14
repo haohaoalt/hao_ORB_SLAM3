@@ -16,7 +16,8 @@
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-
+#include <Eigen/Dense>
+#include <opencv2/core/eigen.hpp>
 #include<iostream>
 #include<algorithm>
 #include<fstream>
@@ -31,6 +32,9 @@
 #include<opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+//haoz: add tf and Converter h for publish pose
+#include <tf/transform_broadcaster.h>
+#include "Converter.h"
 
 using namespace std;
 
@@ -40,11 +44,36 @@ public:
     ImageGrabber(ORB_SLAM3::System* pSLAM):mpSLAM(pSLAM){}
 
     void GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const sensor_msgs::ImageConstPtr& msgRight);
+    //haoz: in ImageGrabber publish pose;
+    void PublishPose(cv::Mat Tcw);
 
     ORB_SLAM3::System* mpSLAM;
     bool do_rectify;
     cv::Mat M1l,M2l,M1r,M2r;
+    ros::Publisher* pPosPub;
 };
+//haoz: add publishPose function 
+void ImageGrabber::PublishPose(cv::Mat Tcw)
+{
+    geometry_msgs::PoseStamped poseMSG;
+    if (!Tcw.empty())
+    {
+
+        cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
+        cv::Mat twc = -Rwc * Tcw.rowRange(0, 3).col(3);
+        vector<float> q = ORB_SLAM3::Converter::toQuaternion(Rwc);
+        poseMSG.pose.position.x = -twc.at<float>(0);
+        poseMSG.pose.position.y = -twc.at<float>(2);
+        poseMSG.pose.position.z = twc.at<float>(1);
+        poseMSG.pose.orientation.x = q[0];
+        poseMSG.pose.orientation.y = q[1];
+        poseMSG.pose.orientation.z = q[2];
+        poseMSG.pose.orientation.w = q[3];
+        poseMSG.header.frame_id = "VSLAM";
+        poseMSG.header.stamp = ros::Time::now();
+        pPosPub->publish(poseMSG);
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -112,16 +141,21 @@ int main(int argc, char **argv)
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
     message_filters::Synchronizer<sync_pol> sync(sync_pol(10), left_sub,right_sub);
     sync.registerCallback(boost::bind(&ImageGrabber::GrabStereo,&igb,_1,_2));
+    //haoz: add ORB_SLAM3/pose and hz is 5
+    ros::Publisher PosPub = nh.advertise<geometry_msgs::PoseStamped>("ORB_SLAM3/pose", 5);
+    igb.pPosPub = &(PosPub);
 
     ros::spin();
 
-    // Stop all threads
-    SLAM.Shutdown();
+
 
     // Save camera trajectory
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory_TUM_Format.txt");
     SLAM.SaveTrajectoryTUM("FrameTrajectory_TUM_Format.txt");
     SLAM.SaveTrajectoryKITTI("FrameTrajectory_KITTI_Format.txt");
+
+    // Stop all threads
+    SLAM.Shutdown();
 
     ros::shutdown();
 
@@ -158,11 +192,25 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
         cv::Mat imLeft, imRight;
         cv::remap(cv_ptrLeft->image,imLeft,M1l,M2l,cv::INTER_LINEAR);
         cv::remap(cv_ptrRight->image,imRight,M1r,M2r,cv::INTER_LINEAR);
-        mpSLAM->TrackStereo(imLeft,imRight,cv_ptrLeft->header.stamp.toSec());
+        // mpSLAM->TrackStereo(imLeft,imRight,cv_ptrLeft->header.stamp.toSec());
+        //haoz : 发布位姿接口
+        cv::Mat Tcw;
+        Sophus::SE3f Tcw_SE3f = mpSLAM->TrackStereo(imLeft, imRight, cv_ptrLeft->header.stamp.toSec());
+        Eigen::Matrix4f Tcw_Matrix = Tcw_SE3f.matrix();
+        cv::eigen2cv(Tcw_Matrix, Tcw);
+        PublishPose(Tcw);
+        // cout << "Tcw:" << Tcw.matrix() << endl;
     }
     else
     {
-        mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec());
+        cv::Mat Tcw;
+        Sophus::SE3f Tcw_SE3f = mpSLAM->TrackStereo(cv_ptrLeft->image, cv_ptrRight->image, cv_ptrLeft->header.stamp.toSec());
+        Eigen::Matrix4f Tcw_Matrix = Tcw_SE3f.matrix();
+        cv::eigen2cv(Tcw_Matrix, Tcw);
+        // mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec());
+        PublishPose(Tcw);
+        // cout << "Tcw:" << Tcw.matrix() << endl;
+        // mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec());
     }
 
 }

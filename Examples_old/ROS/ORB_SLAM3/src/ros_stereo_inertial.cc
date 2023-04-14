@@ -15,7 +15,9 @@
 * You should have received a copy of the GNU General Public License along with ORB-SLAM3.
 * If not, see <http://www.gnu.org/licenses/>.
 */
-
+#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
+#include <opencv2/core/eigen.hpp>
 #include<iostream>
 #include<algorithm>
 #include<fstream>
@@ -24,6 +26,7 @@
 #include<queue>
 #include<thread>
 #include<mutex>
+#include "geometry_msgs/PoseStamped.h"
 
 #include<ros/ros.h>
 #include<cv_bridge/cv_bridge.h>
@@ -50,7 +53,7 @@ class ImageGrabber
 {
 public:
     ImageGrabber(ORB_SLAM3::System* pSLAM, ImuGrabber *pImuGb, const bool bRect, const bool bClahe): mpSLAM(pSLAM), mpImuGb(pImuGb), do_rectify(bRect), mbClahe(bClahe){}
-
+    void PublishPose(cv::Mat Tcw);
     void GrabImageLeft(const sensor_msgs::ImageConstPtr& msg);
     void GrabImageRight(const sensor_msgs::ImageConstPtr& msg);
     cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
@@ -67,9 +70,80 @@ public:
 
     const bool mbClahe;
     cv::Ptr<cv::CLAHE> mClahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+    ros::Publisher *pPosPub;
 };
 
+void ImageGrabber::PublishPose(cv::Mat Tcw)
+{
+    geometry_msgs::PoseStamped poseMSG;
+    if (!Tcw.empty())
+    {
 
+      cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
+      // Rwc与Twc分别代表的就是相机在世界坐标系下的旋转与平移
+      cv::Mat twc = -Rwc * Tcw.rowRange(0, 3).col(3);
+
+      vector<float> q = ORB_SLAM3::Converter::toQuaternion(Rwc);
+
+      /*
+          cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+          cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
+          tf::Matrix3x3 M(Rwc.at<float>(0,0),Rwc.at<float>(0,1),Rwc.at<float>(0,2),
+                          Rwc.at<float>(1,0),Rwc.at<float>(1,1),Rwc.at<float>(1,2),
+                          Rwc.at<float>(2,0),Rwc.at<float>(2,1),Rwc.at<float>(2,2));
+          tf::Vector3 V(twc.at<float>(0), twc.at<float>(1), twc.at<float>(2));
+
+          tf::Transform tfTcw(M,V);
+
+          //mTfBr.sendTransform(tf::StampedTransform(tfTcw,ros::Time::now(), "ORB_SLAM/World", "ORB_SLAM/Camera"));
+      */
+      poseMSG.pose.position.x = -twc.at<float>(0);
+      cout << "PublishPose position.x = " << poseMSG.pose.position.x << endl;
+      poseMSG.pose.position.y = -twc.at<float>(2);
+      cout << "PublishPose position.y = " << poseMSG.pose.position.y << endl;
+      poseMSG.pose.position.z = twc.at<float>(1);
+      cout << "PublishPose position.z = " << poseMSG.pose.position.z << endl;
+      poseMSG.pose.orientation.x = q[0];
+      cout << "PublishPose orientation.x = " << poseMSG.pose.orientation.x << endl;
+      poseMSG.pose.orientation.y = q[1];
+      cout << "PublishPose orientation.y = " << poseMSG.pose.orientation.y << endl;
+      poseMSG.pose.orientation.z = q[2];
+      cout << "PublishPose orientation.z = " << poseMSG.pose.orientation.z << endl;
+      poseMSG.pose.orientation.w = q[3];
+      cout << "PublishPose orientation.w = " << poseMSG.pose.orientation.w << endl;
+      poseMSG.header.frame_id = "VSLAM";
+      poseMSG.header.stamp = ros::Time::now();
+
+      // poseMSG.pose.position.x = twc.at<float>(0);
+      // cout << "PublishPose position.x = " << poseMSG.pose.position.x << endl;
+      // poseMSG.pose.position.y = twc.at<float>(2);
+      // cout << "PublishPose position.y = " << poseMSG.pose.position.y << endl;
+      // poseMSG.pose.position.z = twc.at<float>(1);
+      // cout << "PublishPose position.z = " << poseMSG.pose.position.z << endl;
+      // poseMSG.pose.orientation.x = q[0];
+      // cout << "PublishPose orientation.x = " << poseMSG.pose.orientation.x << endl;
+      // poseMSG.pose.orientation.y = q[1];
+      // cout << "PublishPose orientation.y = " << poseMSG.pose.orientation.y << endl;
+      // poseMSG.pose.orientation.z = q[2];
+      // cout << "PublishPose orientation.z = " << poseMSG.pose.orientation.z << endl;
+      // poseMSG.pose.orientation.w = q[3];
+      // cout << "PublishPose orientation.w = " << poseMSG.pose.orientation.w << endl;
+      // poseMSG.header.frame_id = "VSLAM";
+      // poseMSG.header.stamp = ros::Time::now();
+
+      pPosPub->publish(poseMSG);
+
+      // geometry_msgs::PoseStamped camera_pose;
+      // camera_pose.header.frame_id="stereo";
+      // camera_pose.header.stamp=ros::Time::now();
+      // camera_pose.pose.position.x = poseMSG.pose.position.y;
+      // camera_pose.pose.position.y = -poseMSG.pose.position.x;
+      // camera_pose.pose.position.z =  poseMSG.pose.position.z;
+      // camera_pose.pose.orientation = poseMSG.pose.orientation;
+      // pPosPub->publish(camera_pose);
+      // mlbLost.push_back(mState==LOST);
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -143,6 +217,8 @@ int main(int argc, char **argv)
   ros::Subscriber sub_img_right = n.subscribe("/camera/right/image_raw", 100, &ImageGrabber::GrabImageRight,&igb);
 
   std::thread sync_thread(&ImageGrabber::SyncWithImu,&igb);
+  ros::Publisher PosPub = n.advertise<geometry_msgs::PoseStamped>("ORB_SLAM3_imu/pose", 5);
+  igb.pPosPub = &(PosPub);
 
   ros::spin();
 
@@ -223,7 +299,7 @@ void ImageGrabber::SyncWithImu()
 
       if((tImLeft-tImRight)>maxTimeDiff || (tImRight-tImLeft)>maxTimeDiff)
       {
-        // std::cout << "big time difference" << std::endl;
+        std::cout << "big time difference" << std::endl;
         continue;
       }
       if(tImLeft>mpImuGb->imuBuf.back()->header.stamp.toSec())
@@ -266,8 +342,13 @@ void ImageGrabber::SyncWithImu()
         cv::remap(imLeft,imLeft,M1l,M2l,cv::INTER_LINEAR);
         cv::remap(imRight,imRight,M1r,M2r,cv::INTER_LINEAR);
       }
+      cv::Mat Tcw;
+      Sophus::SE3f Tcw_SE3f = mpSLAM->TrackStereo(imLeft, imRight, tImLeft, vImuMeas);
+      Eigen::Matrix4f Tcw_Matrix = Tcw_SE3f.matrix();
+      cv::eigen2cv(Tcw_Matrix, Tcw);
+      // mpSLAM->TrackStereo(imLeft,imRight,cv_ptrLeft->header.stamp.toSec());
+      PublishPose(Tcw);
 
-      mpSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
 
       std::chrono::milliseconds tSleep(1);
       std::this_thread::sleep_for(tSleep);
