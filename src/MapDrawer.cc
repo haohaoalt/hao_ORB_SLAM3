@@ -21,7 +21,11 @@
 #include "KeyFrame.h"
 #include <pangolin/pangolin.h>
 #include <mutex>
-
+//haoz: PCL save point .h
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+extern int pre_num = 0;
 namespace ORB_SLAM3
 {
 
@@ -149,6 +153,8 @@ void MapDrawer::DrawMapPoints()
     glPointSize(mPointSize);
     glBegin(GL_POINTS);
     glColor3f(0.0,0.0,0.0);
+    // haoz: save pcd map
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_saved(new pcl::PointCloud<pcl::PointXYZ>());
 
     for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
     {
@@ -156,6 +162,17 @@ void MapDrawer::DrawMapPoints()
             continue;
         Eigen::Matrix<float,3,1> pos = vpMPs[i]->GetWorldPos();
         glVertex3f(pos(0),pos(1),pos(2));
+        // haoz: modified to save pcd map
+        pcl::PointXYZ p;
+        p.x = pos(0);
+        p.y = pos(1);
+        p.z = pos(2);
+        cloud_saved->points.push_back(p);
+    }
+    if (cloud_saved->points.size())
+    {
+        pcl::io::savePCDFileBinary("map.pcd", *cloud_saved);
+        pre_num = cloud_saved->points.size();
     }
     glEnd();
 
@@ -171,6 +188,7 @@ void MapDrawer::DrawMapPoints()
         glVertex3f(pos(0),pos(1),pos(2));
 
     }
+
 
     glEnd();
 }

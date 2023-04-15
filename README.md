@@ -271,7 +271,10 @@ System.SaveAtlasToFile: "MH01_to_MH05_stereo_inertial.osa"
 
 ## 10.2 发布位姿
 
-
-
-
 rosbag play --pause g07_kitti_2011_09_30_drive_0027_synced.bag kitti/camera_gray_left/image_raw:=/camera/left/image_raw kitti/camera_gray_right/image_raw:=/camera/right/image_raw
+
+## 10.3  保存地图PCD
+
+没能找到关于 .osa 文件离线加载和可视化的方法，于是对 ORB_SLAM3 的代码进行了简单的修改，使其可以保存 [pcd](https://so.csdn.net/so/search?q=pcd&spm=1001.2101.3001.7020) 格式的点云地图。
+
+参考：[GitHub - DioVei/ORB_SLAM3_with_save: Modify the orb-slam3 code to save the keypoints per frame and the map in PCD format.](https://github.com/DioVei/ORB_SLAM3_with_save "GitHub - DioVei/ORB_SLAM3_with_save: Modify the orb-slam3 code to save the keypoints per frame and the map in PCD format.")
