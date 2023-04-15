@@ -12,8 +12,7 @@ We provide examples to run ORB-SLAM3 in the [EuRoC dataset](http://projects.asl.
 
 This software is based on [ORB-SLAM2](https://github.com/raulmur/ORB_SLAM2) developed by [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2)).
 
-`<a href="https://youtu.be/HyLNq-98LRo" target="_blank"><img src="https://img.youtube.com/vi/HyLNq-98LRo/0.jpg" 
-alt="ORB-SLAM3" width="240" height="180" border="10" />``</a>`
+`<a href="https://youtu.be/HyLNq-98LRo" target="_blank"><img src="https://img.youtube.com/vi/HyLNq-98LRo/0.jpg"  alt="ORB-SLAM3" width="240" height="180" border="10" />``</a>`
 
 ### Related Publications:
 
@@ -266,9 +265,13 @@ You can find a tutorial for visual-inertial calibration and a detailed descripti
 ```python
 System.LoadAtlasFromFile: "MH01_to_MH05_stereo_inertial.osa"
 System.SaveAtlasToFile: "MH01_to_MH05_stereo_inertial.osa" 
-12
 ```
 
 第一行表示从本地加载名为"MH01_to_MH05_stereo_inertial.osa"的地图文件，第二行表示保存名为"MH01_to_MH05_stereo_inertial.osa"的地图到本地。第一次运行建图时注释掉第一行，只使用第二行，加载地图[重定位](https://so.csdn.net/so/search?q=%E9%87%8D%E5%AE%9A%E4%BD%8D&spm=1001.2101.3001.7020)时反过来，亲测同时使用会报错
 
 ## 10.2 发布位姿
+
+
+
+
+rosbag play --pause g07_kitti_2011_09_30_drive_0027_synced.bag kitti/camera_gray_left/image_raw:=/camera/left/image_raw kitti/camera_gray_right/image_raw:=/camera/right/image_raw

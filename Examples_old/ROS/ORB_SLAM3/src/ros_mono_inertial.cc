@@ -24,7 +24,8 @@
 #include<queue>
 #include<thread>
 #include<mutex>
-
+//haoz: this .h is for opencv4.4 but this version use opencv3.2
+// #include "opencv2/imgcodecs/legacy/constants_c.h"
 #include<ros/ros.h>
 #include<cv_bridge/cv_bridge.h>
 #include<sensor_msgs/Imu.h>
@@ -34,7 +35,7 @@
 #include"../../../include/System.h"
 #include"../include/ImuTypes.h"
 
-using namespace std;
+    using namespace std;
 
 class ImuGrabber
 {
